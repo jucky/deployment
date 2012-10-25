@@ -46,7 +46,8 @@ if [ ! -d ${TMPDIR} ]; then
     mkdir ${TMPDIR}
 fi
 
-chmod 700 -R ${SRCDIR}/*
+#chmod 700 -R ${SRCDIR}/*
+umask 0077
 #pkgname=${project}-${version}-${datetime}.pkg
 #tar jcvf ${pkgname} /tmp/${project} --remove-files >> deploy.log
 #####################################################################
@@ -216,7 +217,9 @@ function deploy() {
 	GIT_OPTS=${REVISION}	
 	if [ -d ${project} ]; then 
 	cd $project
-	    $GIT pull ${GIT_OPTS}
+            $GIT stash
+	    $GIT pull --progress
+            $GIT stash clear
 	cd -
 # >> $logfile
 		logging 'update' ${project}
@@ -229,7 +232,7 @@ function deploy() {
 	
 #    $BINDIR/$COMMAND deploy $HOSTNAME $UPLOAD_DIR/$ver/	
 
-	RSYNC_OPTS=" -azvP --backup --backup-dir=${BACKUPDIR} --exclude=.git --log-file=${logfile} --exclude-from=$exclude_from --include-from=$include_from"
+	RSYNC_OPTS=" -auzvP --backup --backup-dir=${BACKUPDIR} --exclude=.git --log-file=${logfile} --exclude-from=$exclude_from --include-from=$include_from"
 
 	if [ -f ${LIBEXECDIR}/${domain}/${host}/before ];then
 		/bin/sh ${LIBEXECDIR}/${domain}/${host}/before
