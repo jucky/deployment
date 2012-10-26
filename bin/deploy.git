@@ -6,6 +6,9 @@
 # Homepage: http://netkiller.sourceforge.net/
 # $Id$
 #####################################################################
+# :set  tabstop=4
+# :set shiftwidth=4
+# :set expandtab
 
 if [ -z $DEPLOY_HOME ]; then
 	echo 'Example: export DEPLOY_HOME=/srv/deploy'
@@ -217,9 +220,10 @@ function deploy() {
 	GIT_OPTS=${REVISION}	
 	if [ -d ${project} ]; then 
 	cd $project
-            $GIT stash
+            $GIT reset HEAD --hard
+            #$GIT stash
 	    $GIT pull --progress
-            $GIT stash clear
+            #$GIT stash clear
 	cd -
 # >> $logfile
 		logging 'update' ${project}
@@ -528,15 +532,36 @@ function stage(){
     logging 'stage' "${STAGE}"
 }
 
+function branch(){
+	local stage=$2
+    local domain=$3
+    local host=$4
+    local branchname=$5
+    
+    cd $SRCDIR/${stage}/${domain}/$host.${domain}
+    if [ -z $branchname ]; then
+        git branch
+    else
+	git reset HEAD --hard
+        git checkout $branchname
+    fi
+}
+
 function usage(){
 echo $"Usage: $0 [OPTION] <server-id> <directory/timepoint>"
 echo -ne "
 OPTION:
-	stage {development|testing|production}
+	    stage {development|testing|production}
         deploy <domain> <host>
+	
+        development <domain> <host>
+        testing <domain> <host>
+        production <domain> <host>	
+
+        branch {development|testing|production} <domain> <host> <branchname>
         revert <domain> <host> <revision>
         backup <domain> <host> <directory>
-	release <domain> <host> <tags> <message>
+        release <domain> <host> <tags> <message>
 
         list
         list <domain> <host>
@@ -544,8 +569,8 @@ OPTION:
         import <domain> <host> <dir>
         export <domain> <host> <dir>
 	
-	clean <domain> <host>   
-	log <project> <line>
+    	clean <domain> <host>   
+	    log <project> <line>
 
         conf list
         conf new <project>
@@ -553,9 +578,9 @@ OPTION:
         conf show <project>
         conf edit <project>	   
 
-	cron show
-	cron setup
-	cron edit
+    	cron show
+    	cron setup
+    	cron edit
 "
 
     exit
@@ -563,22 +588,22 @@ OPTION:
 
 case "$1" in
     stage)
-	stage $2
-	;;
+    	stage $2
+	    ;;
     development)
         STAGE='development'
 	deploy $@
         ;;
     testing)
-	STAGE='testing'
-	deploy $@
+	    STAGE='testing'
+	    deploy $@
         ;;
     production)
         STAGE='production'
-	deploy $@
+	    deploy $@
         ;;
-    deploy)
-        deploy $@
+    branch)
+        branch $@
         ;;
     revert)
         revert $@
@@ -592,9 +617,9 @@ case "$1" in
     backup)
         backup $@
         ;;
-#    switch)
-#	    switch $2
-#        ;;
+    branch)
+	    branch $@
+        ;;
     cron)
         cron $@
         ;;		
