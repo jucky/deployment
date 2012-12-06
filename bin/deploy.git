@@ -2,8 +2,10 @@
 #####################################################################
 # Description: Automation Deployment Script 
 #              Netkiller series utilities
-# Author: Neo<openunix@163.com>
-# Homepage: http://netkiller.sourceforge.net/
+# Author: Neo<netkiller@msn.com>
+# Homepage: http://netkiller.github.com/
+			http://netkiller.sourceforge.net/
+# GIT URL:  https://github.com/netkiller/deployment.git
 # $Id$
 #####################################################################
 # :set  tabstop=4
