@@ -4,7 +4,7 @@
 #              Netkiller series utilities
 # Author: Neo<netkiller@msn.com>
 # Homepage: http://netkiller.github.com/
-			http://netkiller.sourceforge.net/
+#			http://netkiller.sourceforge.net/
 # GIT URL:  https://github.com/netkiller/deployment.git
 # $Id$
 #####################################################################
@@ -202,6 +202,7 @@ function deploy() {
 
     local domain=$2
 	local host=$3
+	local commit=$4
 	local logfile=${LOGDIR}/${host}.${domain}.log
 	local backupdir=${BACKUPDIR}/${host}.${domain}/$(date '+%Y-%m-%d/%H:%M:%S')
 	local message=${STAGE}/${domain}/${host}.${domain}
@@ -225,11 +226,11 @@ function deploy() {
 	exit
     fi
 
-    local revision=$4
+    
         
-    if [ ! -z $revision  ]; then
-        REVISION="-r ${revision}"
-    fi
+    #if [ ! -z $revision  ]; then
+    #    REVISION="-r ${revision}"
+    #fi
 
     config ${domain}/${host}
 
@@ -239,12 +240,22 @@ function deploy() {
 	echo '================================================================================'
 	if [ -d ${project} ]; then 
 		cd $project
-		$GIT reset HEAD --hard >> $logfile
 		#$GIT stash
-		echo -n " Repository: ${REPOSITORY} "
-		$GIT pull --progress
+		#$GIT pull --progress
 		#$GIT stash clear
-		logging 'update' ${project}
+		#$GIT checkout .
+		
+		$GIT reset HEAD --hard >> $logfile
+		echo -n " Repository: ${REPOSITORY} "
+		$GIT pull --progress		
+		if [ ! -z $commit ]; then
+			$GIT checkout $commit .
+			echo " Commit: $commit"
+			logging 'checkout' "commit:$commit ${project} "
+		else
+			logging 'update' ${project}
+		fi
+		
 	else
 	    mkdir -p ${project}
 		$GIT clone ${REPOSITORY} ${project} >> $logfile
@@ -308,25 +319,16 @@ function deploy() {
 
 function revert() {
 
-	local domain=$2
-	local host=$3
-    local revision=$4
-	
-    if [ -z $domain ]; then
-        usage
-    fi
-	
-    if [ -z $host ]; then
-        usage
-    fi
-	
-    if [ -z $revision  ]; then
-        usage
-    else
-		REVISION="-r ${revision}"
-    fi
-	#echo $domain , $host, $dir; exit
-	deploy $@
+    #if [ $STAGE = 'testing' -o $STAGE = 'development' -o $STAGE = 'production' ]; then
+	local domain=$3
+ 	local host=$4
+    	local commit=$5
+#    else
+#	local domain=$1
+#        local host=$2
+#        local revision=$3
+    #fi
+    deploy $STAGE $domain $host $commit
 }
 
 function timepoint {
@@ -444,10 +446,6 @@ function release() {
         usage
     fi
 
-#    if [ -z $host ]; then
-#        usage
-#    fi
-#
     if [ -z $message ]; then
 	echo -n "Message: "
         read message
@@ -502,15 +500,12 @@ function usage(){
 echo $"Usage: $0 [OPTION] <server-id> <directory/timepoint>"
 echo -ne "
 OPTION:
-	stage {development|testing|production}
-	deploy <domain> <host>
-	
 	development <domain> <host>
 	testing <domain> <host>
 	production <domain> <host>	
 	
 	branch {development|testing|production} <domain> <host> <branchname>
-	revert <domain> <host> <revision>
+	revert {development|testing|production} <domain> <host> <revision>
 	backup <domain> <host> <directory>
 	release <domain> <host> <tags> <message>
 	
@@ -525,6 +520,9 @@ OPTION:
 	cron setup
 	cron edit
 "
+#	stage {development|testing|production}
+#	deploy <domain> <host>
+#	revert <domain> <host> <revision>
 
 #	conf new <project>
 #	conf remove <project>
@@ -554,13 +552,8 @@ case "$1" in
         branch $@
         ;;
     revert)
+	STAGE=$2
         revert $@
-        ;;		
-    import)
-        import $@
-        ;;
-    export)
-        svnexport $@
         ;;	
     backup)
         backup $@
