@@ -29,20 +29,17 @@ TMPDIR=$(mktemp -d --suffix=.tmp -p /tmp deploy.XXXXXX)
 SVN=/usr/bin/svn
 GIT=/usr/bin/git
 
-TIMEPOINT=`date '+%Y-%m-%d.%H-%M-%S'`
 BACKUPDIR=/backup
 RSYNC="rsync"
 UPLOAD_DIR=$TMPDIR
 REVISION=''
+DEBUG='yes'
 # development  production  testing
 if [ -z $STAGE ]; then
     echo 'Example: touch conf/stage.conf'
     echo "STAGE='development' or STAGE='testing' or STAGE='production'"
     exit
 fi
-
-SUBVERSION=''
-DEBUG='yes'
 #================================================================================
 
 if [ ! -d ${TMPDIR} ]; then
@@ -57,7 +54,7 @@ umask 0077
 
 function logging(){
 	local logfile="$LOGDIR/$LOGFILE"
-	local timepoint=$(date -d "today" +"%Y-%m-%d_%H:%M:%S")
+	local timepoint=$(date -d "today" +"%Y-%m-%d %H:%M:%S")
 	local status=$1
 	local message=$2
 	echo "[$timepoint] [${status}] ${message}" >> $logfile
@@ -66,7 +63,7 @@ function logging(){
 function debug(){
 	if [ ${DEBUG} = 'yes' ]; then
 		local logfile="$LOGDIR/debug.log"
-		local timepoint=$(date -d "today" +"%Y-%m-%d_%H:%M:%S")
+		local timepoint=$(date -d "today" +"%Y-%m-%d %H:%M:%S")
 		local status=$1
 		local message=$2
 		echo "[$timepoint] [${status}] ${message}" >> $logfile
@@ -204,17 +201,24 @@ function deploy() {
     local domain=$2
 	local host=$3
 	local logfile=${LOGDIR}/${host}.${domain}.log
-	local backupdir=${BACKUPDIR}/${host}.${domain}/${TIMEPOINT}
+	local backupdir=${BACKUPDIR}/${host}.${domain}/$(date '+%Y-%m-%d/%H:%M:%S')
+	local message=${STAGE}/${domain}/${host}.${domain}
 
     if [ $# -lt 3 ]; then
         usage
     fi
 
+	if [ ${STAGE} = 'production' ]; then
+		read -p "Are you sure you want to continue deploying? [y/n]" -n 1 key
+		echo
+		if [ $key != 'y' ]; then
+			exit
+		fi
+	fi
     if [ $host = 'all' ]; then
 	for h in $(ls -1 $SYSCONFDIR/${STAGE}/$domain/ | cut -d. -f1)
 	do
 	    /bin/sh $BINDIR/deploy deploy $domain $h
-
 	done
 	exit
     fi
@@ -230,41 +234,42 @@ function deploy() {
 	project=$SRCDIR/${STAGE}/${domain}/${host}.${domain}
  
 	GIT_OPTS=${REVISION}
-	
+	echo '================================================================================'
 	if [ -d ${project} ]; then 
 		cd $project
-		$GIT reset HEAD --hard
+		$GIT reset HEAD --hard >> $logfile
 		#$GIT stash
+		echo -n " Repository: ${REPOSITORY} "
 		$GIT pull --progress
 		#$GIT stash clear
-		cd -
-# >> $logfile
 		logging 'update' ${project}
 	else
 	    mkdir -p ${project}
-		#echo ${project}
-		$GIT clone ${REPOSITORY} ${project} 
-#>> $logfile
+		$GIT clone ${REPOSITORY} ${project} >> $logfile
 		logging 'checkout' ${project} 
 	fi
-	
-#   $BINDIR/$COMMAND deploy $HOSTNAME $UPLOAD_DIR/$ver/
-	
+	echo '================================================================================'
 	RSYNC_OPTS=" -azv --backup --backup-dir=${backupdir} --exclude=.git --log-file=${logfile} --exclude-from=$exclude_from --include-from=$include_from"
 
 	if [ -d ${SHAREDIR}/${STAGE}/${domain}/${host}/ ]; then
 		cp -a ${SHAREDIR}/${STAGE}/${domain}/${host}/* ${project}/
 	fi
+	echo '- share:' >> ${logfile}
+	echo ' Share [ OK ]'
 	if [ -f ${LIBEXECDIR}/${domain}/${host}/before ];then
-		/bin/sh ${LIBEXECDIR}/${domain}/${host}/before
+		/bin/sh ${LIBEXECDIR}/${domain}/${host}/before >> ${logfile}
 	fi
-
+	echo '- libexec:' >> ${logfile}
+	echo ' Libexec [ OK ]'
     find $SRCDIR/* -type f -name "Thumbs.db" -exec rm -rf {} \;
-
+	echo '================================================================================'
+	
 	for addr in ${REMOTE} 
 	do
-    	echo ${addr}
-
+		
+    	echo " Deploy [${message}] ${addr}"
+		echo '================================================================================'
+		
 		case ${MODE} in
 		    FTP)
 				ftpdeploy
@@ -285,9 +290,9 @@ function deploy() {
 		esac
 		
 		if [ -z "${REVISION}" ]; then
-			logging 'deploy' "${project} => ${addr}:${DESTINATION}"
+			logging 'deploy' "${message} => ${addr}:${DESTINATION}"
 		else
-			logging 'revert' "${project} => ${addr}:${DESTINATION}"
+			logging 'revert' "${message} => ${addr}:${DESTINATION}"
 		fi
 		echo '--------------------------------------------------' >> ${logfile}
 	done
@@ -323,6 +328,7 @@ function revert() {
 }
 
 function timepoint {
+	TIMEPOINT=`date '+%Y-%m-%d.%H-%M-%S'`
     echo $TIMEPOINT >> timepoint.log
 }
 
